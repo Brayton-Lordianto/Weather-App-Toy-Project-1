@@ -8,6 +8,7 @@
 import SwiftUI
 import CoreLocation
 import WeatherKit
+import Charts
 
 class LocationManager: NSObject, ObservableObject, CLLocationManagerDelegate {
     
@@ -56,7 +57,8 @@ struct HourlyForecastView: View {
                 HStack {
                     ForEach(hourWeatherList,  id: \.date) { hourWeather in
                         VStack(spacing: 20) {
-                            Text(hourWeather.date.formatted(date: .omitted, time: .shortened))
+                            // Text(hourWeather.date.formatted(date: .omitted, time: .shortened)) // 12:00 etc
+                            Text(hourWeather.date.formatAsAbbreviatedTime()) // 12AM etc
                             
                             // shows the hour weather condition -- ex. sunny, clooudy etc
                             Image(systemName: "\(hourWeather.symbolName).fill")
@@ -76,18 +78,71 @@ struct HourlyForecastView: View {
     }
 }
 
+// instead of just the date, I wnat it to show as like Mon or Tue etc
+extension Date {
+    func formatAsAbbreviatedDay() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: self)
+    }
+    
+    func formatAsAbbreviatedTime() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "ha"
+        return formatter.string(from: self)
+    }
+}
+
 struct TenDayForecastView: View {
+    // you get weather for the next ten days
     let dayWeatherList: [DayWeather]
     
     var body: some View {
         VStack {
             // 26.27 - finsihing ten forecast view.
             Text("10 Day Forecast")
+                .font(.caption)
+                .opacity(0.5)
             
+            List(dayWeatherList, id: \.date) { dailyWeather in
+                HStack {
+                    Text(dailyWeather.date.formatAsAbbreviatedDay()) // MON TUE ...
+                        .frame(maxWidth: 50, alignment:.leading)
+                    
+                    Image(systemName: "\(dailyWeather.symbolName)")
+                        .foregroundColor(.yellow)
+                    
+                    Text(dailyWeather.lowTemperature.formatted())
+                        .frame(maxWidth: .infinity)
+                    
+                    Text(dailyWeather.highTemperature.formatted())
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
+                .listRowBackground(Color.red)
+            }
+            .listStyle(.plain)
         }
+        .background {
+            Color.blue
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 10.0, style: .continuous))
+        .foregroundColor(.white)
     }
 }
 
+struct hourlyForecastChartView: View {
+    var hourlyWeatherData: [HourWeather]
+    
+    var body: some View {
+        Chart {
+            ForEach(hourlyWeatherData.prefix(10), id: \.date) { hourlyWeather in
+                // MARK: can use point mark, line mark, bar mark, etc
+                BarMark(x: .value("Hour", hourlyWeather.date.formatAsAbbreviatedTime()),
+                         y: .value("Temperature", hourlyWeather.temperature.value))
+            }
+        }
+    }
+}
 
 struct ContentView: View {
     // we need the location manager and the weather fetcher
@@ -123,6 +178,9 @@ struct ContentView: View {
                     // weather.hourlyForecast.forecast gives everything from a lot
                     // HourlyForecastView(hourWeatherList: weather.hourlyForecast.forecast)
                     HourlyForecastView(hourWeatherList: hourlyWeatherData)
+                    
+                    // chart
+                    hourlyForecastChartView(hourlyWeatherData: hourlyWeatherData)
                     
                     // [DayForecast]
                     TenDayForecastView(dayWeatherList: weather.dailyForecast.forecast)
